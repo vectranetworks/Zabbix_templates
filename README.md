@@ -29,6 +29,7 @@ Create a Vectra Brain host and link this template to it. Two macros are being us
   - **{$API_KEY}**: Vectra's API key (My profile > API Token)
   - **{$HOST}**: Vectra Brain Hostname (or IP address)
 
+> [!NOTE]
 > The required permission in the role is: **View > Health**
 
 ## Discovery rules
@@ -78,7 +79,7 @@ All items are gathered using a unified API endpoint. A **parent item** serves as
 |Traffic drop status for sensor {#SENSORNAME}|`HTTP agent`|<p>Traffic drop status from sensor/p> |
 |Traffic drop message for sensor {#SENSORNAME}|`HTTP agent`|<p>Traffic drop message from sensor/p> |
 
-
+> [!TIP]
 > Based on the Vectra Brain's form-factor, certain items will not be compatible and must be deactivated. Tags have been assigned to items to distinguish those that are specific to the platform. This is a one-time configuration.
 
 ## Triggers
