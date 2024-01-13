@@ -3,6 +3,9 @@ zabbix_export:
   template_groups:
     - uuid: 7df96b18c230490a9a0a9e2307226338
       name: Templates
+  host_groups:
+    - uuid: d05096721f634154b6339457807ed38f
+      name: 'Vectra sensors'
   templates:
     - uuid: 7e797df0921944e994a3e9f660f34d13
       template: 'Vectra Detect'
@@ -190,6 +193,7 @@ zabbix_export:
           key: vectra.health
           trends: '0'
           value_type: TEXT
+          timeout: 15s
           url: 'https://{$HOST}/api/v2.5/health'
           headers:
             - name: Authorization
@@ -429,38 +433,10 @@ zabbix_export:
       discovery_rules:
         - uuid: 862490bf7f8146c4b996050ff5bd5548
           name: 'Sensor discovery'
-          type: HTTP_AGENT
+          type: DEPENDENT
           key: vectra.discovery.sensors
+          delay: '0'
           item_prototypes:
-            - uuid: bfa219c5941e434385bf1aba77c45692
-              name: 'Interface status for sensor {#SENSORLUID} for eth0'
-              type: DEPENDENT
-              key: 'Vectra.interface.sensor.eth0.status.[{#SENSORLUID}]'
-              delay: '0'
-              trends: '0'
-              value_type: TEXT
-              preprocessing:
-                - type: JSONPATH
-                  parameters:
-                    - '$.body.network.interfaces.sensors.["{#SENSORLUID}"].eth0.link'
-                - type: LTRIM
-                  parameters:
-                    - '['
-                - type: RTRIM
-                  parameters:
-                    - ']'
-              master_item:
-                key: vectra.health
-              tags:
-                - tag: VSENSOR
-              trigger_prototypes:
-                - uuid: 8ae87f774b124116b6911e06595768a4
-                  expression: |
-                    change(/Vectra Detect/Vectra.interface.sensor.eth0.status.[{#SENSORLUID}])=1
-                    and
-                    last(/Vectra Detect/Vectra.interface.sensor.eth0.status.[{#SENSORLUID}])<>"UP"
-                  name: 'Interface status for sensor {#SENSORLUID} for eth0'
-                  priority: HIGH
             - uuid: 88385faaece048cbb476c056bbd7d33c
               name: 'Last check for sensor {#SENSORNAME}'
               type: DEPENDENT
@@ -577,7 +553,9 @@ zabbix_export:
                 - uuid: 7c90b0f88e994252aab9bf65bd11a96e
                   expression: 'last(/Vectra Detect/vectra.trafficdrop.message.[{#SENSORNAME}])<>"All interfaces have traffic volume within range"'
                   name: 'Traffic drop message for sensor {#SENSORNAME}'
+                  event_name: 'Sensor {#SENSORNAME} reported an error message'
                   priority: WARNING
+                  description: 'error message: {ITEM.VALUE}'
             - uuid: 883dcfd1b23e467582dd1458ccaa9a1e
               name: 'Traffic drop status for sensor {#SENSORNAME}'
               type: DEPENDENT
@@ -600,8 +578,10 @@ zabbix_export:
               trigger_prototypes:
                 - uuid: 47a895e5bc3f4bfab4ec5f92f49bf993
                   expression: 'last(/Vectra Detect/vectra.trafficdrop.status.[{#SENSORNAME}])<>"OK"'
-                  name: 'Traffic drop status for sensor {#SENSORNAME}'
+                  name: 'Sensor {#SENSORNAME} status'
+                  event_name: 'Sensor {#SENSORNAME} in {ITEM.VALUE} state'
                   priority: HIGH
+                  description: 'check error message for this sensor'
             - uuid: 441e067bc81e4a16ae8b16077ee6adf3
               name: 'Aggregated Peak Traffic for sensor {#SENSORNAME}'
               type: DEPENDENT
@@ -622,17 +602,31 @@ zabbix_export:
                 key: vectra.health
           graph_prototypes:
             - uuid: e14ca5cc8ec341b6bc85f5e0e5f59c10
-              name: 'Aggregated Peak Traffic'
+              name: 'Aggregated Peak Traffic {#SENSORNAME}'
               graph_items:
                 - color: 1A7C11
                   calc_fnc: ALL
                   item:
                     host: 'Vectra Detect'
                     key: 'vectra_aggregated_peak_traffic_mbps_[{#SENSORNAME}]'
-          url: 'https://{$HOST}/api/v2.5/health'
-          headers:
-            - name: Authorization
-              value: 'Token {$API_KEY}'
+          host_prototypes:
+            - uuid: 386ef7be8619432abfd3141f4820dd30
+              host: '{#SENSORNAME}'
+              name: 'Sensor {#SENSORNAME}'
+              group_links:
+                - group:
+                    name: 'Vectra sensors'
+              templates:
+                - name: 'Vectra Sensor'
+              macros:
+                - macro: '{$SENSORLUID}'
+                  value: '{#SENSORLUID}'
+                - macro: '{$SENSORNAME}'
+                  value: '{#SENSORNAME}'
+                - macro: '{$SENSORSN}'
+                  value: '{#SENSORSN}'
+          master_item:
+            key: vectra.health
           preprocessing:
             - type: JAVASCRIPT
               parameters:
@@ -640,8 +634,10 @@ zabbix_export:
                   res = []
                   obj = JSON.parse(value)
                   
-                  for (sensor in obj.connectivity.sensors) {
-                      	res.push({"{#SENSORNAME}": obj.connectivity.sensors[sensor].name,"{#SENSORSN}": obj.connectivity.sensors[sensor].serial_number,"{#SENSORLUID}": obj.connectivity.sensors[sensor].luid})
+                  for (sensor in obj.body.connectivity.sensors) {
+                  			
+                      res.push({"{#SENSORNAME}": obj.body.connectivity.sensors[sensor].name,"{#SENSORSN}": obj.body.connectivity.sensors[sensor].serial_number,"{#SENSORLUID}": obj.body.connectivity.sensors[sensor].luid})
+                  
                   }
                   
                   return JSON.stringify(res)
@@ -744,6 +740,92 @@ zabbix_export:
                       value:
                         host: 'Vectra Detect'
                         key: vectra.brain.version
+    - uuid: a7efc9608184496ebcaf9d0bc67db07b
+      template: 'Vectra Sensor'
+      name: 'Vectra Sensor'
+      groups:
+        - name: Templates
+      items:
+        - uuid: ffdf3ad698ee42ecb4b6043eeb647606
+          name: 'Sensor Health Data'
+          type: HTTP_AGENT
+          key: vectra.health.sensor
+          trends: '0'
+          value_type: TEXT
+          timeout: 15s
+          url: 'https://{$HOST}/api/v2.5/health'
+          headers:
+            - name: Authorization
+              value: 'Token {$API_KEY}'
+          output_format: JSON
+      discovery_rules:
+        - uuid: cab843ea7d974d23a87dd92c4c7a1703
+          name: 'Interface discovery'
+          type: DEPENDENT
+          key: 'vectra.sensor.[{#SENSORNAME}]'
+          delay: '0'
+          item_prototypes:
+            - uuid: b0b93ab433104345a4c282310da09cf4
+              name: 'Interface status for sensor {#SENSORNAME} and {#INTF}'
+              type: DEPENDENT
+              key: 'vectra.sensor.status.[{#SENSORNAME}{#INTF}]'
+              delay: '0'
+              trends: '0'
+              value_type: TEXT
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.body.network.interfaces.sensors["{$SENSORLUID}"].["{#INTF}"].link'
+              master_item:
+                key: vectra.health.sensor
+              trigger_prototypes:
+                - uuid: be1c849f5cdf4241a00e1243518037e1
+                  expression: 'change(/Vectra Sensor/vectra.sensor.status.[{#SENSORNAME}{#INTF}])=1 and last(/Vectra Sensor/vectra.sensor.status.[{#SENSORNAME}{#INTF}],#1)<>"UP"'
+                  name: 'interface status for sensor {#SENSORNAME} {#INTF}'
+                  event_name: 'Interface {#INTF} is {ITEM.VALUE} for {#SENSORNAME}'
+                  priority: WARNING
+            - uuid: 2d65b74985f34562a8da8718169cdd13
+              name: 'Peak Traffic for  {#SENSORNAME} {#INTF}'
+              type: DEPENDENT
+              key: 'vectra.sensor.[{#INTF}]'
+              delay: '0'
+              value_type: FLOAT
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.body.network.traffic.sensors["{$SENSORNAME}"].interface_peak_traffic.["{#INTF}"].peak_traffic_mbps'
+              master_item:
+                key: vectra.health.sensor
+          graph_prototypes:
+            - uuid: 7670fea395904cb79290fbf5f47cb8f2
+              name: 'Peak Traffic per interfaces for {#SENSORNAME} {#INTF}'
+              graph_items:
+                - color: 1A7C11
+                  calc_fnc: ALL
+                  item:
+                    host: 'Vectra Sensor'
+                    key: 'vectra.sensor.[{#INTF}]'
+          master_item:
+            key: vectra.health.sensor
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  res = []
+                  obj = JSON.parse(value)
+                  
+                  for (intf in obj.body.network.interfaces.sensors["{$SENSORLUID}"]) {
+                  
+                          res.push({"{#SENSORNAME}": "{$SENSORNAME}","{#INTF}": intf})
+                  		
+                  }
+                  
+                  
+                  return JSON.stringify(res)
+                  
+      macros:
+        - macro: '{$SENSORNAME}'
+          value: '{HOST.NAME}'
   graphs:
     - uuid: 3ec3d90318034b1c985535fd6e7466ee
       name: CPU

@@ -2,7 +2,10 @@
 
 ## Overview
 
-The template to monitor The Vectra Platform by Zabbix v.6.4 using HTTP Agent.
+The templates to monitor The Vectra Platform by Zabbix v.6.4 using HTTP Agent. It is composed of 2 templates:
+
+- Vectra Detect
+- Vectra Sensor
 
 This template was tested on Vectra Quadrant UX Platform:
 
@@ -16,6 +19,8 @@ Tested with the following form-factor:
 - B101
 - AWS
 - vmware
+
+The API is used to monitor the Vectra Platform (no SNMP). To obtain the Health information of the Brain and all sensors, it's necessary to query only the Vectra Brain. The required network traffic is limited to communication between the Zabbix server and the Vectra Brain over port 443.
 
 > [!IMPORTANT]  
 > This template has not been tested with Vectra Respond UX platform but content is similar. Only the authentication medthod (oauth2) and API URL Path have changed.
@@ -34,15 +39,34 @@ Create a Vectra Brain host and link this template to it. Two macros are being us
 
 ## Discovery rules
 
+### Vectra Detect
+
 The template uses a LLD rule to identify all sensors connected to a Brain.
 
 |Name|Type|Description|Key|
 |----|----|----------------|--------|
 |Sensor Discovery |`HTTP agent`|<p>Discovery for sensor name, serial number and LUID</p> |vectra.discovery.sensors|
 
+It also uses a Host prototype rule to:
+
+1. Discover every sensor
+2. Add them as new host
+3. Apply the Vectra Sensor template
+4. The macros SENSORNAME, SENSORSN and SENSORLUID are passed to the host.
+
+### Vectra Sensor
+
+The template uses a LLD rule to identify interfaces available a sensor
+
+|Name|Type|Description|Key|
+|----|----|----------------|--------|
+|Interface discovery |`HTTP agent`|<p>Discovery interfaces available for the sensor</p> | Interface discovery|
+
 ## Items collected
 
-All items are gathered using a unified API endpoint. A **parent item** serves as the basis for retrieving data, while various dependent items are utilized to gather diverse elements.
+### Vectra Detect
+
+All items are gathered using the Health API endpoint. A **parent item** serves as the basis for retrieving data, while various dependent items are utilized to gather diverse elements.
 
 |Name|Type|Description|
 |----------|----|--------------|
@@ -69,30 +93,47 @@ All items are gathered using a unified API endpoint. A **parent item** serves as
 |Brain Network interface status: eth1|`HTTP agent`|<p>Vectra Brain eth1 interface status</p> |
 |Brain Network interface status: eth2|`HTTP agent`|<p>Vectra Brain eth2 interface status</p> |
 |Brain Network interface status: eth3|`HTTP agent`|<p>Vectra Brain eth3 interface status</p> |
-|Connectivity Status for sensor {#SENSORNAME}|`HTTP agent`|<p>Sensor status/p> |
-|Pairing status for sensor {#SENSORSN}|`HTTP agent`|<p>Sensor pairing status/p> |
-|Connectivity Status for sensor {#SENSORNAME}|`HTTP agent`|<p>Sensor status/p> |
-|Interface status for sensor {#SENSORLUID} for eth0|`HTTP agent`|<p>Sensor interface status (eth0)/p> |
-|Last check for sensor {#SENSORNAME}|`HTTP agent`|<p>Last time the sensor connects back to the brain /p> |
-|Message for sensor {#SENSORNAME}|`HTTP agent`|<p>Status message from sensor /p> |
-|Aggregated Peak Traffic for sensor {#SENSORNAME}|`HTTP agent`|<p>Aggregated traffic stats from sensor/p> |
-|Traffic drop status for sensor {#SENSORNAME}|`HTTP agent`|<p>Traffic drop status from sensor/p> |
-|Traffic drop message for sensor {#SENSORNAME}|`HTTP agent`|<p>Traffic drop message from sensor/p> |
+|Connectivity Status for sensor {#SENSORNAME}|`HTTP agent`|<p>Sensor status</p> |
+|Pairing status for sensor {#SENSORSN}|`HTTP agent`|<p>Sensor pairing status</p> |
+|Connectivity Status for sensor {#SENSORNAME}|`HTTP agent`|<p>Sensor status</p> |
+|Interface status for sensor {#SENSORLUID} for eth0|`HTTP agent`|<p>Sensor interface status (eth0)</p> |
+|Last check for sensor {#SENSORNAME}|`HTTP agent`|<p>Last time the sensor connects back to the brain</p> |
+|Message for sensor {#SENSORNAME}|`HTTP agent`|<p>Status message from sensor</p> |
+|Aggregated Peak Traffic for sensor {#SENSORNAME}|`HTTP agent`|<p>Aggregated traffic stats from sensor</p> |
+|Traffic drop status for sensor {#SENSORNAME}|`HTTP agent`|<p>Traffic drop status from sensor<p> |
+|Traffic drop message for sensor {#SENSORNAME}|`HTTP agent`|<p>Traffic drop message from sensor</p> |
 
 > [!TIP]
 > Based on the Vectra Brain's form-factor, certain items will not be compatible and must be deactivated. Tags have been assigned to items to distinguish those that are specific to the platform. This is a one-time configuration.
 
+### Vectra Sensor
+
+All items are gathered using the Health API endpoint. A **parent item** serves as the basis for retrieving data, while various dependent items are utilized to gather diverse elements.
+
+|Name|Type|Description|
+|----------|----|--------------|
+|Interface status for sensor {#SENSORNAME} and {#INTF}|`HTTP agent`|<p>Interface status</p> |
+|Peak Traffic for {#SENSORNAME} {#INTF}|`HTTP agent`|<p>Peak traffic measure for that interface</p> |
+
 ## Triggers
 
-Appropriate triggers are associated with the items
+Appropriate triggers are associated with the items.
 
 ## Graphs
+
+### Vectra Detect
 
 |Name|Description|
 |----------|--------------|
 |CPU|<p>Vectra Brain CPU stats</p> |
 |Disk usage|<p>Vectra Brain Disk stats</p> |
 |Aggregated Peak Traffic|<p> Aggregated Peak Traffic for all sensors</p> |
+
+### Vectra Sensor
+
+|Name|Description|
+|----------|--------------|
+|Peak Traffic per interfaces for {#SENSORNAME} {#INTF}|<p>Network interfaces stats</p> |
 
 ## Feedback
 
